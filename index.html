@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    
+    
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico">
+    
+
+    <title>Tito's Workout App</title>
+
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="fonts/leagueKit/stylesheet.css" rel="stylesheet">
+    <link href="http://fonts.googleapis.com/css?family=Oswald" rel="stylesheet" type="text/css">
+    <link href="css/jumbotron-narrow.css" rel="stylesheet">
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/jquery-2.1.3.min.js"></script>
+    <script type='text/javascript'>
+    
+        var maxData;
+        var socket;
+        if (window.location.host=="localhost:8080" || window.location.host=="127.0.0.1:8080"){
+            console.log('Running locally');
+            socket = io.connect(window.location.host);
+        } else {
+            socket = io.connect(window.location.host+':8000');
+        }
+
+        socket.on('maxWeightRecord', function (data) {
+            maxData=data;
+            createMaxWeightTable(maxData);
+        });
+
+        socket.on('maxCardioRecord', function (data) {
+            maxData=data;
+            createMaxCardioTable(maxData);
+        });
+
+        socket.on('Tumblr post successful', function() {
+            location.reload();
+        });
+        $(function() {
+            $('#addWeightExercise').click(function(event) {
+                  addExerciseTable();
+            });
+          
+            $('#addCardioExercise').click(function(event) {
+                  addCardioTable();
+            });
+      
+            $('#toggleMaxRecord').click(function(event) {
+                  console.log("toggleMaxRecord button clicked");
+                  toggleVisibility();
+            });
+      
+            $('#submit1').click(function(event) {
+                //check to see that all sets have value > 1
+                
+                if (checkObjectify(objectify())){
+                    socket.emit('can I be awesome', objectify())
+                }
+                
+                
+            });
+          
+        });
+        
+        // checkObjectify returns FALSE if it finds a value < 1 in a reps field
+        // with the corresponding weight not empty, or if it finds a 
+        // 0 or blank in a cardio field.
+        // otherwise, it returns TRUE.
+        
+        function checkObjectify(obj){
+            entryData = obj;
+                
+            for (var table in entryData) {
+                if (table.search("exerciseID")!=(-1)){
+                    dataTable = entryData[table];
+                    if (dataTable.dataTableName.search("dataTableExercise")!=(-1)){
+                        var reps = dataTable.reps
+                        var weights = dataTable.weights;
+                        for (var i=0; i < reps.length; i++){
+                            if (reps[i]<1){
+                                alert("Reps cannot be 0 or blank.");
+                                return false;
+                            }
+                        }
+                    } else if (dataTable.dataTableName.search("dataTableCardio")!=(-1)){
+                        if (dataTable.time>0){ // Performs value check and null check
+                        } else {
+                            alert("Time cannot be 0 or blank.");
+                            return false;
+                        }
+                    }
+                }
+                
+            }
+            return true;
+        }
+        
+        function objectify() {
+            var tables = document.getElementsByName("dataTable");
+            var n = tables.length;
+            var entryData = {numExerciseIDs: n};
+            
+            var i = 0 //outer loop tracker
+            while (i < n) {
+                
+                var exerName= document.getElementsByName("exercises"+i)[0].value;
+                
+                if (hasClass(tables[i], "dataTableExercise")){
+                    var setsElementArray = document.getElementsByName("sets"+i);
+                    var repsElementArray = document.getElementsByName("reps"+i);
+                    var weightsElementArray = document.getElementsByName("weights"+i);
+                    
+                    var setsValueArray = [];
+                    var repsValueArray = [];
+                    var weightsValueArray = [];
+                    
+                    for (x = 0; x < setsElementArray.length; x++){
+                        setsValueArray[x] = setsElementArray[x].value;
+                        repsValueArray[x] = repsElementArray[x].value;
+                        
+                        if (exerName=="Deadlifts"||exerName=="Bench Press"||exerName=="Squats"||exerName=="Military Press"){
+                            weightsValueArray[x] = weightsElementArray[x].value*2+45;
+                        } else {
+                            weightsValueArray[x] = weightsElementArray[x].value;
+                        }
+                    }
+                    entryData["exerciseID"+i]={
+                        exerciseName: exerName,
+                        dataTableName: "dataTableExercise",
+                        sets: setsValueArray,
+                        reps: repsValueArray,
+                        weights: weightsValueArray,
+                        arrayLength: setsValueArray.length, //the amount of values in each Array
+                    };
+                } else if (hasClass(tables[i], "dataTableCardio")){
+                    var timeValue=document.getElementsByName("time"+i)[0].value;
+                    var caloriesValue=document.getElementsByName("calories"+i)[0].value;
+                    entryData["exerciseID"+i]={
+                        exerciseName: exerName,
+                        dataTableName: "dataTableCardio",
+                        time: timeValue,
+                        calories: caloriesValue
+                    }
+                   }
+                i++;
+            }
+            console.log(entryData);
+            return entryData;
+        }
+    
+        function getScreenSize(){
+            var width = $(window).width();
+            var height = $(window).height();
+        }
+    
+        function addWeightRow(tableNum){
+                $('#dataTable' + tableNum).append('<tr id="row" name="row'+tableNum+'">\
+                <td style="border-top: 0px"> <input class="form-control" type="text" id="set" size="10" name="sets'+tableNum+'" placeholder="Sets"> </td>\
+                <td style="border-top: 0px"> <input class="form-control" type="text" id="rep" size="10" name="reps'+tableNum+'" placeholder="Reps"> </td>\
+                <td style="border-top: 0px"> <input class="form-control" type="text" id="weight" size="10" name="weights'+tableNum+'" placeholder="Weight"> </td>\
+                </tr>\
+                ')
+            getScreenSize();
+        }
+    
+    
+        var numExercises = 0;
+        
+
+        function addExerciseTable() {
+            $('#tablesDiv0body').append('<table id="dataTable'+numExercises+'" class="dataTableExercise table table-condensed" name="dataTable" width="350px" border="0">\
+            <tbody>\
+            <tr id="row" name="row'+numExercises+'">\
+                <td style="border-top: 0px" class="oneThird"> <select class="form-control dropDownWidth" id="exercises'+numExercises+'" name="exercises'+numExercises+'">\
+                    <option value="Bench Press">Bench Press</option>\
+                    <option value="Deadlifts">Deadlifts</option>\
+                    <option value="Leg Curl Raise">Leg Curl Raise</option>\
+                    <option value="Military Press">Military Press</option>\
+                    <option value="Pull Ups">Pull Ups</option>\
+                    <option value="Squats">Squats</option>\
+                    <option value="Wood Choppers">Wood Choppers</option>\
+                </select>\
+                </td>\
+                <td style="border-top: 0px" class="oneThird"> </td>\
+                <td style="border-top: 0px" class="oneThird"> <input type="button" class="btn btn-default btn-responsive fullWidth" id="addSetRep'+numExercises+'" value="Add Set/Rep">  </td>\
+            </tr>\
+            <tr id="row" name="row'+numExercises+'">\
+                <td style="border-top: 0px" class="oneThird"> <input class="form-control" type="text" id="weightExercise" size="10" name="sets'+numExercises+'" placeholder="Sets"> </td>\
+                <td style="border-top: 0px" class="oneThird"> <input class="form-control" type="text" id="weightExercise" size="10" name="reps'+numExercises+'" placeholder="Reps"> </td>\
+                <td style="border-top: 0px" class="oneThird"> <input class="form-control" type="text" id="weightExercise" size="10" name="weights'+numExercises+'" placeholder="Weight"> </td>\
+            </tr>\
+            </tbody>\
+            </table>');
+            var localNum = numExercises
+            $('#addSetRep'+localNum).click(function(event) {
+                addWeightRow(localNum)
+            });
+            numExercises++;
+        }
+    
+        function addCardioTable() {
+            $('#tablesDiv0body').append('<table id="dataTable'+numExercises+'" class="dataTableCardio table table-condensed" name="dataTable" width="350px" border="0">\
+            <tbody>\
+            <tr id="row" name="row'+numExercises+'">\
+            <td style="border-top: 0px"> <select class="form-control dropDownWidth" id="cardioExercise" name="exercises'+numExercises+'">\
+                <option value="CrossRamp">CrossRamp</option>\
+                <option value="Moon Jogger">Moon Jogger</option>\
+                <option value="Stairmaster">Stairmaster</option>\
+            </select>\
+            </td>\
+            <td style="border-top: 0px" class="oneThird"> </td>\
+            <td style="border-top: 0px" class="oneThird"> <input type="button" class="btn btn-default btn-responsive fullWidth" style="visibility:hidden;" id="addSetRep'+numExercises+'" value="Add Set/Rep" disabled> </td>\
+            </tr>\
+            <tr id="row" name="row'+numExercises+'">\
+            <td style="border-top: 0px;" class="oneThird"><input class="form-control" type="text" id="cardioExercise" size="10" name="time'+numExercises+'" placeholder="Time"> </td>\
+            <td style="border-top: 0px" class="oneThird"><input class="form-control" type="text" id="cardioExercise" size="10" name="calories'+numExercises+'" placeholder="Calories"> </td>\
+            <td style="border-top: 0px" class="oneThird"> <input class="form-control" type="text" size="10" disabled="" style="opacity: 0; cursor: default;"> </td>\
+            </tr>\
+            </tbody>\
+            </table>');
+            numExercises++;
+        }
+    
+        function createMaxWeightTable(data) {
+            var tableString = '<table id="maxWeightRecord" style="text-align: center; margin-left:auto; margin-right:auto; width:98%;" class="table table-bordered" name="maxWeightRecord"\ width="350px" border="0"> <tbody> <tr id="row" name="row">\
+                        <td style="border-top: 0px"><id="maxWeight" size="10" name="maxExercise"><strong>Exercise</strong></td>\
+                        <td style="border-top: 0px"><id="maxWeight" size="10" name="maxWeight"><strong>Max Weight</strong></td>\
+                    </tr>'
+            var keys = Object.keys(data).sort();
+            for (var i = 0; i < keys.length; i++) {
+                var key = keys[i];
+                if (data.hasOwnProperty(key)) {
+                    //console.log(key + " -> " + data[key]);
+                    tableString+='<tr id="row" name="row">\
+                            <td style="border-top: 0px"><id="maxWeight" size="10" name="maxExercise">'+key+'</td>\
+                            <td style="border-top: 0px"><id="maxWeight" size="10" name="maxWeight">'+data[key]+'</td>\
+                        </tr>'
+                    }
+                }
+            tableString+='</tbody> </table>';
+            
+            $('#tablesDiv1').append(tableString);
+            
+        }
+    
+        function createMaxCardioTable(data){
+            var tableString = '<table id="maxCardioRecord" style="text-align: center; margin-left:auto; margin-right:auto; width:98%;" class="table table-bordered" name="maxCardioRecord"\ width="350px" border="0"> <tbody> <tr id="row" name="row">\
+                        <td style="border-top: 0px"><id="maxExercise" size="10" name="maxExercise"><strong>Exercise</strong></td>\
+                        <td style="border-top: 0px"><id="caloriesPerMinute" size="10" name="maxCaloriesPerMinute"><strong>Calories Per Minute</strong></td>\
+                    </tr>'
+            for (var key in data) {
+                if (data.hasOwnProperty(key)) {
+                    //console.log(key + " -> " + data[key]);
+                    tableString+='<tr id="row" name="row">\
+                            <td style="border-top: 0px"><id="maxWeight" size="10" name="maxExercise">'+key+'</td>\
+                            <td style="border-top: 0px"><id="maxWeight" size="10" name="maxCaloriesPerMinute">'+data[key]+'</td>\
+                        </tr>'
+                    }
+                }
+            tableString+='</tbody> </table>';
+            $('#tablesDiv2').append(tableString);
+            
+        }
+    
+    
+        function toggleVisibility(num, rum, bum) {
+           var e = document.getElementById("tablesDiv"+num);
+           var f = document.getElementById("tablesDiv"+rum);
+           var g = document.getElementById("tablesDiv"+bum);
+           
+           var e0 = document.getElementById("nav"+num);
+           var f0 = document.getElementById("nav"+rum);
+           var g0 = document.getElementById("nav"+bum);
+           
+          e.style.display = '';
+          f.style.display = 'none';
+          g.style.display = 'none';
+          e0.style.backgroundColor = '#DFE7EE';
+          f0.style.backgroundColor = '';
+          g0.style.backgroundColor = '';
+         }
+    
+        function hasClass(element, cls) {
+            return (' ' + element.className + ' ').indexOf(' ' + cls + ' ') > -1;
+        }
+    
+    
+    </script>
+  </head>
+
+  <body>
+
+    <div class="container" style="margin-bottom: 30px;">
+      <div class="jumbotron" style="margin-bottom: 0px;">
+        <header class="header">
+            <ul class="nav nav-pills nav-justified">
+              <li role="presentation" id="nav0" style="background-color: #DFE7EE; font-family: 'Oswald', sans-serif;">
+                <a onclick="toggleVisibility(0, 1, 2)" style="color:#000000; border-radius: 0px; padding: 15px 15px; cursor: default;
+                
+                -moz-user-select: none; -webkit-user-select: none; -ms-user-select:none; user-select:none;-o-user-select:none;" unselectable='on' onselectstart='return false;' onmousedown='return false;' >Workout Log</a>
+              </li>
+              <li role="presentation" id="nav1" style="background-color:; font-family: 'Oswald', sans-serif;">
+                <a onclick="toggleVisibility(1, 0, 2)" style="color:#000000; border-radius: 0px; padding: 15px 15px; cursor: default;
+                
+                -moz-user-select: none; -webkit-user-select: none; -ms-user-select:none; user-select:none;-o-user-select:none;" unselectable='on' onselectstart='return false;' onmousedown='return false;'>Weight Record</a>
+              </li>
+              <li role="presentation" id="nav2" style="background-color:; font-family: 'Oswald', sans-serif;">
+                <a onclick="toggleVisibility(2, 0, 1)" style="color:#000000; border-radius: 0px; padding: 15px 15px; cursor: default;
+                
+                -moz-user-select: none; -webkit-user-select: none; -ms-user-select:none; user-select:none;-o-user-select:none;" unselectable='on' onselectstart='return false;' onmousedown='return false;'>Cardio Record</a>
+              </li>
+            </ul>
+       </header>
+        
+            <div id='tablesDiv0' class='tablesDiv0'>
+                <div id='tablesDiv0body' class="containerMinHeight" style="margin-bottom: 30px;">
+                </div>
+
+                <input type="button" class="btn btn-default btn-responsive" id='addWeightExercise' value="Add Weight Exercise"/>
+                <input type="button" class="btn btn-default btn-responsive" id='addCardioExercise' value="Add Cardio Exercise"/>
+                <input type="button" class="btn btn-default btn-responsive" id='submit1' value="Make Tumblr Post"/>
+
+            </div>
+            
+            <div id='tablesDiv1' style='display: none; min-height: 335px; padding-right:60px; padding-left:60px; margin-bottom: 40px; margin-top: 30px;'>
+            </div>
+            
+            <div id='tablesDiv2' style='display: none; min-height: 335px; padding-right:60px; padding-left:60px; margin-bottom: 40px; margin-top: 30px;'>
+            </div>
+
+            
+      </div>
+
+      <footer class="footer">
+<!--            Author: Hector "Tito" Callejas-->
+      </footer>
+
+    </div>
+
+  </body>
+</html>

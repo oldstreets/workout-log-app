@@ -1,0 +1,41 @@
+{
+  "name": "BTB-Post-App",
+  "version": "1.0.0",
+  "description": "Application for posting workout logs to tumblr",
+  "keywords": [
+    "Tumblr",
+    "Node.js",
+    "application",
+    "workout"
+  ],
+  "author": {
+    "name": "Hector (Tito) Callejas",
+    "email": "hmcallejas@gmail.com",
+    "url": "https://github.com/oldstreets/"
+  },
+  "homepage": "https://github.com/oldstreets/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oldstreets/workout-log-app"
+  },
+
+  "engines": {
+    "node": ">= 0.6.0",
+    "npm": ">= 1.0.0"
+  },
+
+  "dependencies": {
+    "express": "4.11.0",
+    "tumblr.js": "0.0.4",
+    "socket.io": "1.2.1",
+    "redis": "0.12.1",
+    "bootstrap": "3.3.2",
+    "json-update": "1.2.0"
+    
+  },
+  "devDependencies": {},
+  "bundleDependencies": [],
+
+  "private": true,
+  "main": "index.js"
+}
