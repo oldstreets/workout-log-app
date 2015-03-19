@@ -9,9 +9,8 @@
     <meta name="description" content="">
     <meta name="author" content="">
     <link rel="icon" href="../../favicon.ico">
-    
 
-    <title>Tito's Workout App</title>
+    <title>Workout Log App</title>
 
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="fonts/leagueKit/stylesheet.css" rel="stylesheet">
@@ -24,27 +23,37 @@
     
         var maxData;
         var socket;
-        if (window.location.host=="localhost:8080" || window.location.host=="127.0.0.1:8080"){
-            console.log('Running locally');
-            socket = io.connect(window.location.host);
-        } else {
-            socket = io.connect(window.location.host+':8000');
-        }
+	    $(function() {
+            if (window.location.host=="localhost:8080" || window.location.host=="127.0.0.1:8080"){
+                console.log('Running locally');
+                socket = io.connect(window.location.host);
+            } else {
+                socket = io.connect(window.location.host+':8000');
+            }
+      
+            socket.on('maxWeightRecord', function (data) {
+                maxData=data;
+                createMaxWeightTable(maxData);
+            });
+      
+            socket.on('maxCardioRecord', function (data) {
+                maxData=data;
+                createMaxCardioTable(maxData);
+            });
+      
+            socket.on('here is some awesome', function(data) {
+                var newText = data.text;
+                $('#text1').val(newText);
+            });
+      
+            socket.on('Tumblr post successful', function(){
+                location.reload();
+            });
 
-        socket.on('maxWeightRecord', function (data) {
-            maxData=data;
-            createMaxWeightTable(maxData);
-        });
-
-        socket.on('maxCardioRecord', function (data) {
-            maxData=data;
-            createMaxCardioTable(maxData);
-        });
-
-        socket.on('Tumblr post successful', function() {
-            location.reload();
-        });
-        $(function() {
+            socket.on('Entry text is empty', function(){
+                location.reload();
+            });
+            
             $('#addWeightExercise').click(function(event) {
                   addExerciseTable();
             });
@@ -59,23 +68,16 @@
             });
       
             $('#submit1').click(function(event) {
-                //check to see that all sets have value > 1
-                
                 if (checkObjectify(objectify())){
+                    disableSubmitButton();
                     socket.emit('can I be awesome', objectify())
                 }
-                
-                
             });
-          
         });
         
-        // checkObjectify returns FALSE if it finds a value < 1 in a reps field
-        // with the corresponding weight not empty, or if it finds a 
-        // 0 or blank in a cardio field.
-        // otherwise, it returns TRUE.
-        
         function checkObjectify(obj){
+        //this function prevents the infinity value being assigned exercise names within the redis database.
+        //if reps or time value is blank or 0, and weights and calories value is not an empty string, then return false. else, return true. this
             entryData = obj;
                 
             for (var table in entryData) {
@@ -85,14 +87,13 @@
                         var reps = dataTable.reps
                         var weights = dataTable.weights;
                         for (var i=0; i < reps.length; i++){
-                            if (reps[i]<1){
+                            if (reps[i]<1 && (!weights[i]==false)){
                                 alert("Reps cannot be 0 or blank.");
                                 return false;
                             }
                         }
                     } else if (dataTable.dataTableName.search("dataTableCardio")!=(-1)){
-                        if (dataTable.time>0){ // Performs value check and null check
-                        } else {
+                        if (dataTable.time<.0000000001 && (!dataTable.calories==false)){
                             alert("Time cannot be 0 or blank.");
                             return false;
                         }
@@ -102,7 +103,15 @@
             }
             return true;
         }
-        
+    
+        function disableSubmitButton(){
+            document.getElementById("submit1").disabled=true;
+        }
+    
+        function enableSubmitButton(){
+            document.getElementById("submit1").disabled=false;
+        }
+    
         function objectify() {
             var tables = document.getElementsByName("dataTable");
             var n = tables.length;
@@ -125,12 +134,7 @@
                     for (x = 0; x < setsElementArray.length; x++){
                         setsValueArray[x] = setsElementArray[x].value;
                         repsValueArray[x] = repsElementArray[x].value;
-                        
-                        if (exerName=="Deadlifts"||exerName=="Bench Press"||exerName=="Squats"||exerName=="Military Press"){
-                            weightsValueArray[x] = weightsElementArray[x].value*2+45;
-                        } else {
-                            weightsValueArray[x] = weightsElementArray[x].value;
-                        }
+                        weightsValueArray[x] = weightsElementArray[x].value;
                     }
                     entryData["exerciseID"+i]={
                         exerciseName: exerName,
@@ -138,7 +142,7 @@
                         sets: setsValueArray,
                         reps: repsValueArray,
                         weights: weightsValueArray,
-                        arrayLength: setsValueArray.length, //the amount of values in each Array
+                        arrayLength: setsValueArray.length, //the number of values in each array
                     };
                 } else if (hasClass(tables[i], "dataTableCardio")){
                     var timeValue=document.getElementsByName("time"+i)[0].value;
@@ -174,7 +178,6 @@
     
         var numExercises = 0;
         
-
         function addExerciseTable() {
             $('#tablesDiv0body').append('<table id="dataTable'+numExercises+'" class="dataTableExercise table table-condensed" name="dataTable" width="350px" border="0">\
             <tbody>\
@@ -238,7 +241,6 @@
             for (var i = 0; i < keys.length; i++) {
                 var key = keys[i];
                 if (data.hasOwnProperty(key)) {
-                    //console.log(key + " -> " + data[key]);
                     tableString+='<tr id="row" name="row">\
                             <td style="border-top: 0px"><id="maxWeight" size="10" name="maxExercise">'+key+'</td>\
                             <td style="border-top: 0px"><id="maxWeight" size="10" name="maxWeight">'+data[key]+'</td>\
@@ -258,7 +260,6 @@
                     </tr>'
             for (var key in data) {
                 if (data.hasOwnProperty(key)) {
-                    //console.log(key + " -> " + data[key]);
                     tableString+='<tr id="row" name="row">\
                             <td style="border-top: 0px"><id="maxWeight" size="10" name="maxExercise">'+key+'</td>\
                             <td style="border-top: 0px"><id="maxWeight" size="10" name="maxCaloriesPerMinute">'+data[key]+'</td>\
@@ -292,58 +293,44 @@
             return (' ' + element.className + ' ').indexOf(' ' + cls + ' ') > -1;
         }
     
-    
     </script>
   </head>
 
   <body>
-
     <div class="container" style="margin-bottom: 30px;">
       <div class="jumbotron" style="margin-bottom: 0px;">
         <header class="header">
             <ul class="nav nav-pills nav-justified">
               <li role="presentation" id="nav0" style="background-color: #DFE7EE; font-family: 'Oswald', sans-serif;">
                 <a onclick="toggleVisibility(0, 1, 2)" style="color:#000000; border-radius: 0px; padding: 15px 15px; cursor: default;
-                
                 -moz-user-select: none; -webkit-user-select: none; -ms-user-select:none; user-select:none;-o-user-select:none;" unselectable='on' onselectstart='return false;' onmousedown='return false;' >Workout Log</a>
               </li>
               <li role="presentation" id="nav1" style="background-color:; font-family: 'Oswald', sans-serif;">
                 <a onclick="toggleVisibility(1, 0, 2)" style="color:#000000; border-radius: 0px; padding: 15px 15px; cursor: default;
-                
                 -moz-user-select: none; -webkit-user-select: none; -ms-user-select:none; user-select:none;-o-user-select:none;" unselectable='on' onselectstart='return false;' onmousedown='return false;'>Weight Record</a>
               </li>
               <li role="presentation" id="nav2" style="background-color:; font-family: 'Oswald', sans-serif;">
                 <a onclick="toggleVisibility(2, 0, 1)" style="color:#000000; border-radius: 0px; padding: 15px 15px; cursor: default;
-                
                 -moz-user-select: none; -webkit-user-select: none; -ms-user-select:none; user-select:none;-o-user-select:none;" unselectable='on' onselectstart='return false;' onmousedown='return false;'>Cardio Record</a>
               </li>
             </ul>
-       </header>
-        
-            <div id='tablesDiv0' class='tablesDiv0'>
-                <div id='tablesDiv0body' class="containerMinHeight" style="margin-bottom: 30px;">
-                </div>
-
-                <input type="button" class="btn btn-default btn-responsive" id='addWeightExercise' value="Add Weight Exercise"/>
-                <input type="button" class="btn btn-default btn-responsive" id='addCardioExercise' value="Add Cardio Exercise"/>
-                <input type="button" class="btn btn-default btn-responsive" id='submit1' value="Make Tumblr Post"/>
-
+        </header>
+        <div id='tablesDiv0' class='tablesDiv0'>
+            <div id='tablesDiv0body' class="containerMinHeight" style="margin-bottom: 30px;">
             </div>
-            
-            <div id='tablesDiv1' style='display: none; min-height: 335px; padding-right:60px; padding-left:60px; margin-bottom: 40px; margin-top: 30px;'>
-            </div>
-            
-            <div id='tablesDiv2' style='display: none; min-height: 335px; padding-right:60px; padding-left:60px; margin-bottom: 40px; margin-top: 30px;'>
-            </div>
-
-            
+            <input type="button" class="btn btn-default btn-responsive" id='addWeightExercise' value="Add Weight Exercise"/>
+            <input type="button" class="btn btn-default btn-responsive" id='addCardioExercise' value="Add Cardio Exercise"/>
+            <input type="button" class="btn btn-default btn-responsive" id='submit1' value="Make Tumblr Post"/>
+        </div>
+        <div id='tablesDiv1' style='display: none; min-height: 335px; padding-right:60px; padding-left:60px; margin-bottom: 40px; margin-top: 30px;'>
+        </div>
+        <div id='tablesDiv2' style='display: none; min-height: 335px; padding-right:60px; padding-left:60px; margin-bottom: 40px; margin-top: 30px;'>
+        </div>
       </div>
-
       <footer class="footer">
-<!--            Author: Hector "Tito" Callejas-->
+            <br>
+            Author: Hector "Tito" Callejas
       </footer>
-
     </div>
-
   </body>
 </html>

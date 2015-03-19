@@ -37,6 +37,38 @@ server.listen(process.env.OPENSHIFT_NODEJS_PORT || 8080,
 
 });
 
+//functions to format tumblr posts
+
+function rowNotEmpty(set, rep, weight){          //return TRUE if row has at least one value that's not an empty string
+    if ((set!="")||(rep!="")||(weight!="")){
+        return true;
+    }
+    return false;
+}
+
+function rowNotEmptyCardio(time, calories){      //return TRUE if row has at least one value that's not an empty string
+    if ((time!="")||(calories!="")){
+        return true;
+    }
+    return false;
+}
+
+function entryNotEmpty(entryString){             //return TRUE if entry is not an empty string
+    if (entryString!=""){
+        return true;
+    }
+    return false;
+}
+
+function addWeightBar(exerName, weight){         //if exercise has weight bar, double weight value and add 45
+    if (exerName=="Deadlifts"||exerName=="Bench Press"||exerName=="Squats"||exerName=="Military Press"){
+        return (weight*2)+45;
+    }
+    return weight;
+}
+
+//end functstion to format tumblr posts
+
 var directory = __dirname + '/';
 
 app.get('/', function (req, res) {
@@ -69,8 +101,9 @@ io.on('connection', function (socket) {
                         }
                     i++;
                 }
+                console.log(data);
                 
-                var entryText='';
+                var fullEntryText='';
                 var newline = "\n";
                 var front = "x&nbsp;&nbsp;&nbsp;(";
                 var middle = "x&nbsp;&nbsp;&nbsp;";
@@ -86,68 +119,81 @@ io.on('connection', function (socket) {
                     // Wrap for-body in another scope so that variable assignment exerciseData persists.
                     (function() {
                         var exerciseData = data["exerciseID"+y];
-                        entryText += newline+newline+exerciseData.exerciseName.bold();
+                        var name = exerciseData.exerciseName;
+                        var tableEntryText="";
+                     
+                        console.log(exerciseData.dataTableName);
+                     
                         if (exerciseData.dataTableName=="dataTableExercise"){
                             for (z=0; z<exerciseData.arrayLength; z++){
-                              // Wrap for-body in another scope and pass in z so it persists
-                              (function(z) {
-                                if (exerciseData.exerciseName=="Leg Curl Raise"){
-                                    if (exerciseData.sets[z]>1){
-                                        entryText += newline+exerciseData.sets[z]+front+exerciseData.reps[z]+endLCR1;
-                                    } else {
-                                        entryText += newline+exerciseData.reps[z]+endLCR0
-                                    }
-                                } else {
-                                    if (exerciseData.sets[z]>1) {
-                                        entryText += newline+exerciseData.sets[z]+front+exerciseData.reps[z]+middle+exerciseData.weights[z]+end;
-                                    } else {
-                                        entryText += newline+exerciseData.reps[z]+middle+exerciseData.weights[z]+endNoSets;
-                                    }
-                                }
-                                client2.hget("max weight", exerciseData.exerciseName, function (err, obj) {
-                                  if (exerciseData.exerciseName=="Pull Ups"){  //need this to get the properly assign negative max weight
-                                        if (exerciseData.weights[z]<obj) {
-                                            client2.hset("max weight", exerciseData.exerciseName, exerciseData.weights[z]);
+                                (function(z) {
+                                var sets = exerciseData.sets[z];
+                                var reps = exerciseData.reps[z];
+                                var weight = exerciseData.weights[z];
+                                if (rowNotEmpty(sets, reps, weight)){
+                                    weight = addWeightBar(name, weight);
+                                    if (name=="Leg Curl Raise"){
+                                        if (sets>1){
+                                            tableEntryText += newline+sets+front+reps+endLCR1;
+                                        } else {
+                                            tableEntryText += newline+reps+endLCR0
                                         }
-                                  }else if ((obj==null)||(exerciseData.weights[z]>obj)){
-                                      client2.hset("max weight", exerciseData.exerciseName, exerciseData.weights[z]);
-                                  }
-                                });
-                              })(z);
+                                    } else {
+                                        if (sets>1) {
+                                            tableEntryText += newline+sets+front+reps+middle+weight+end;
+                                        } else {
+                                            tableEntryText += newline+reps+middle+weight+endNoSets;
+                                        }
+                                    }
+                                    client2.hget("max weight", name, function (err, obj) {
+                                      if (name=="Pull Ups"){  //special handling for "Pull Ups"
+                                            if (weight<obj) {
+                                                client2.hset("max weight", name, weight);
+                                            }
+                                      }else if ((obj==null)||(weight>obj)){
+                                          client2.hset("max weight", name, weight);
+                                      }
+                                    });
+                                }
+                            })(z);
                             }
-                            //client2.hgetall("max weight", function (err, obj) {
-                                //console.log(obj);
-                            //});
-                     
+                            if (entryNotEmpty(tableEntryText)){
+                                fullEntryText += newline+newline+name.bold()+tableEntryText;
+                            }
                         } else if (exerciseData.dataTableName=="dataTableCardio"){
-                            entryText += newline+exerciseData.time+cardioMiddle+exerciseData.calories+cardioEnd;
-                            client2.hget("max cardio", exerciseData.exerciseName, function (err, obj) {
-                              if ((obj==null)||((exerciseData.calories/exerciseData.time)>obj)){
-                                client2.hset("max cardio", exerciseData.exerciseName, exerciseData.calories/exerciseData.time);
-                              };
-                            });
-                            //client2.hgetall("max cardio", function (err, obj) {
-                                //console.log(obj);
-                            //});
+                            var time = exerciseData.time;
+                            var calories = exerciseData.calories;
+                     
+                            if (rowNotEmptyCardio(time, calories)){
+                                tableEntryText += newline+time+cardioMiddle+calories+cardioEnd;
+                                fullEntryText += newline+newline+name.bold()+tableEntryText;
+                     
+                                client2.hget("max cardio", name, function (err, obj) {
+                                  if ((obj==null)||((calories/time)>obj)){
+                                    client2.hset("max cardio", name, calories/time);
+                                  };
+                                });
+                            }
                         } else {
-                            // TODO: consider throwing an error instead
-                            console.log("Error with constructing entryText"); 
+                            console.log("Error with constructing entryText");
                         }
                     })()
                 }
-                
-                // Post to Tumblr!
-                client.text('oldstreetsbtb.tumblr.com',
-                    { 'title': newName,
-                    'body': entryText},
-                    function (err, resp) {
-                        if (err==null){
-                            socket.emit('Tumblr post successful');
-                        } else {
-                            console.log('Tumblr post not successful');
+                if (fullEntryText!=""){
+                    client.text('oldstreetsbtb.tumblr.com',
+                        { 'title': newName,
+                        'body': fullEntryText},
+                        function (err, resp) {
+                            if (err==null){
+                                socket.emit('Tumblr post successful');
+                            } else {
+                                console.log('Tumblr post not successful.');
+                            }
                         }
-                    }
-                );
+                    );
+                } else {
+                    socket.emit('Entry text is empty');  
+                }
             });
-    });
+        });
 });
